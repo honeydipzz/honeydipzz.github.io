@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>和宝宝的世界</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg-deep: #070b14;
+    --bg-surface: #0d1525;
+    --bg-card: rgba(16, 24, 48, 0.85);
+    --bg-glass: rgba(14, 22, 42, 0.7);
+    --border-subtle: rgba(255, 255, 255, 0.06);
+    --border-glow: rgba(201, 169, 110, 0.3);
+    --text-primary: #e8e4dd;
+    --text-secondary: rgba(232, 228, 221, 0.55);
+    --text-muted: rgba(232, 228, 221, 0.3);
+    --accent: #c9a96e;
+    --accent-light: #e4c992;
+    --accent-dim: rgba(201, 169, 110, 0.15);
+    --danger: #e05252;
+    --danger-dim: rgba(224, 82, 82, 0.15);
+    --success: #4ade80;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --shadow-deep: 0 24px 80px rgba(0,0,0,0.6);
+    --font-display: 'Playfair Display', serif;
+    --font-body: 'DM Sans', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  html, body { height: 100%; overflow: hidden; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ===== VIEWS ===== */
+  .view { position: absolute; inset: 0; transition: opacity 0.6s ease, transform 0.6s ease; }
+  .view.hidden { opacity: 0; pointer-events: none; transform: scale(0.97); }
+
+  /* ===== GLOBE VIEW ===== */
+  #globe-view { z-index: 1; }
+  #globe-canvas-container { position: absolute; inset: 0; }
+  #globe-canvas-container canvas { display: block; width: 100% !important; height: 100% !important; }
+
+  .globe-header {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    padding: 28px 40px; display: flex; justify-content: space-between; align-items: center;
+    pointer-events: none;
+  }
+  .globe-header h1 {
+    font-family: var(--font-display); font-size: 26px; font-weight: 600;
+    letter-spacing: 0.5px; color: var(--text-primary);
+    text-shadow: 0 2px 30px rgba(0,0,0,0.5);
+  }
+  .globe-header h1 span { color: var(--accent); }
+
+  .btn-add-location {
+    pointer-events: all; cursor: pointer;
+    background: var(--accent); color: var(--bg-deep);
+    border: none; padding: 10px 22px; border-radius: 40px;
+    font-family: var(--font-body); font-size: 14px; font-weight: 600;
+    letter-spacing: 0.3px; transition: all 0.3s ease;
+    box-shadow: 0 4px 20px rgba(201, 169, 110, 0.3);
+  }
+  .btn-add-location:hover { background: var(--accent-light); transform: translateY(-1px); box-shadow: 0 6px 30px rgba(201, 169, 110, 0.45); }
+
+  .globe-hint {
+    position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 10;
+    font-size: 13px; color: var(--text-muted); letter-spacing: 1.5px;
+    animation: pulse-hint 3s ease-in-out infinite;
+  }
+  @keyframes pulse-hint { 0%, 100% { opacity: 0.4; } 50% { opacity: 0.8; } }
+
+  /* ===== LOCATION TOOLTIP ===== */
+  .location-tooltip {
+    position: fixed; z-index: 20; pointer-events: none;
+    background: var(--bg-glass); backdrop-filter: blur(20px) saturate(1.4);
+    border: 1px solid var(--border-glow); border-radius: var(--radius-md);
+    padding: 14px 18px; min-width: 180px;
+    box-shadow: var(--shadow-deep), 0 0 40px rgba(201, 169, 110, 0.08);
+    opacity: 0; transition: opacity 0.25s ease;
+  }
+  .location-tooltip.visible { opacity: 1; }
+  .location-tooltip .tt-name { font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--accent-light); margin-bottom: 4px; }
+  .location-tooltip .tt-desc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
+  .location-tooltip .tt-hint { font-size: 11px; color: var(--text-muted); margin-top: 8px; letter-spacing: 0.5px; }
+
+  /* ===== MODAL OVERLAY ===== */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(4, 6, 12, 0.8); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.35s ease;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); padding: 36px; width: 440px; max-width: 92vw;
+    box-shadow: var(--shadow-deep);
+    transform: translateY(20px) scale(0.96); transition: transform 0.35s ease;
+  }
+  .modal-overlay.open .modal { transform: translateY(0) scale(1); }
+
+  .modal h2 {
+    font-family: var(--font-display); font-size: 22px; font-weight: 600;
+    margin-bottom: 24px; color: var(--text-primary);
+  }
+  .modal label {
+    display: block; font-size: 12px; font-weight: 500; color: var(--text-secondary);
+    margin-bottom: 6px; letter-spacing: 0.8px;
+  }
+  .modal input[type="text"], .modal textarea {
+    width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+    color: var(--text-primary); font-family: var(--font-body); font-size: 14px;
+    outline: none; transition: border-color 0.2s ease;
+    margin-bottom: 18px;
+  }
+  .modal input[type="text"]:focus, .modal textarea:focus { border-color: var(--accent); }
+  .modal textarea { resize: vertical; min-height: 70px; }
+  .modal .coord-row { display: flex; gap: 14px; }
+  .modal .coord-row > div { flex: 1; }
+  .modal .coord-row input { margin-bottom: 0; }
+
+  .modal-actions { display: flex; gap: 12px; margin-top: 28px; justify-content: flex-end; }
+  .btn {
+    cursor: pointer; border: none; padding: 10px 22px; border-radius: var(--radius-sm);
+    font-family: var(--font-body); font-size: 14px; font-weight: 600;
+    transition: all 0.2s ease; letter-spacing: 0.3px;
+  }
+  .btn-primary { background: var(--accent); color: var(--bg-deep); }
+  .btn-primary:hover { background: var(--accent-light); }
+  .btn-ghost { background: transparent; color: var(--text-secondary); border: 1px solid var(--border-subtle); }
+  .btn-ghost:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+  .btn-danger { background: var(--danger-dim); color: var(--danger); }
+  .btn-danger:hover { background: rgba(224, 82, 82, 0.25); }
+  .btn-sm { padding: 7px 14px; font-size: 13px; }
+
+  /* ===== PHOTO GALLERY VIEW ===== */
+  #gallery-view { z-index: 2; background: var(--bg-deep); overflow-y: auto; }
+  #gallery-view::-webkit-scrollbar { width: 6px; }
+  #gallery-view::-webkit-scrollbar-track { background: transparent; }
+  #gallery-view::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 3px; }
+
+  .gallery-header {
+    position: sticky; top: 0; z-index: 10; padding: 20px 40px;
+    background: rgba(7, 11, 20, 0.88); backdrop-filter: blur(20px) saturate(1.3);
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; gap: 20px;
+  }
+  .btn-back {
+    cursor: pointer; background: none; border: 1px solid var(--border-subtle);
+    color: var(--text-secondary); width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease; font-size: 18px; flex-shrink: 0;
+  }
+  .btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+  .gallery-location-info { flex: 1; }
+  .gallery-location-info h2 {
+    font-family: var(--font-display); font-size: 24px; font-weight: 600;
+    color: var(--text-primary); line-height: 1.2;
+  }
+  .gallery-location-info .gallery-coords {
+    font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-top: 3px;
+  }
+  .gallery-location-info .gallery-desc {
+    font-size: 13px; color: var(--text-secondary); margin-top: 5px; line-height: 1.5;
+  }
+
+  .gallery-actions { display: flex; gap: 10px; flex-shrink: 0; }
+  .btn-edit-location { cursor: pointer; background: var(--accent-dim); color: var(--accent); border: none; padding: 9px 18px; border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 13px; font-weight: 600; transition: all 0.2s ease; }
+  .btn-edit-location:hover { background: rgba(201, 169, 110, 0.25); }
+
+  .gallery-body { padding: 32px 40px 80px; }
+
+  .photo-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  .photo-card {
+    position: relative; border-radius: var(--radius-md); overflow: hidden;
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    transition: all 0.3s ease; cursor: default;
+    animation: card-in 0.5s ease backwards;
+  }
+  @keyframes card-in { from { opacity: 0; transform: translateY(16px) scale(0.97); } }
+  .photo-card:hover { border-color: rgba(201, 169, 110, 0.2); transform: translateY(-2px); box-shadow: 0 12px 40px rgba(0,0,0,0.3); }
+
+  .photo-card .photo-img-wrap {
+    position: relative; width: 100%; aspect-ratio: 4/3; overflow: hidden; background: rgba(0,0,0,0.3); cursor: pointer;
+  }
+  .photo-card .photo-img-wrap img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
+  .photo-card:hover .photo-img-wrap img { transform: scale(1.04); }
+
+  .photo-card .photo-delete-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    width: 32px; height: 32px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+    color: var(--text-secondary); font-size: 16px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: all 0.2s ease;
+  }
+  .photo-card:hover .photo-delete-btn { opacity: 1; }
+  .photo-card .photo-delete-btn:hover { background: var(--danger); color: #fff; }
+
+  .photo-card .photo-caption {
+    padding: 14px 16px; min-height: 48px;
+    font-size: 14px; color: var(--text-secondary); line-height: 1.5;
+    cursor: text; border-top: 1px solid var(--border-subtle);
+    transition: background 0.2s ease;
+  }
+  .photo-card .photo-caption:hover { background: rgba(255,255,255,0.02); }
+  .photo-card .photo-caption .caption-edit-hint {
+    font-size: 10px; color: var(--text-muted); letter-spacing: 0.8px; margin-bottom: 4px;
+  }
+
+  .photo-card .photo-caption-input {
+    width: 100%; background: rgba(255,255,255,0.05); border: 1px solid var(--accent);
+    border-radius: 6px; padding: 8px 10px; color: var(--text-primary);
+    font-family: var(--font-body); font-size: 14px; outline: none; line-height: 1.5;
+  }
+
+  /* Upload card */
+  .upload-card {
+    border: 2px dashed rgba(255,255,255,0.08); border-radius: var(--radius-md);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 220px; cursor: pointer; transition: all 0.3s ease;
+    background: transparent;
+  }
+  .upload-card:hover { border-color: var(--accent); background: var(--accent-dim); }
+  .upload-card .upload-icon { font-size: 36px; color: var(--text-muted); margin-bottom: 12px; transition: color 0.3s ease; }
+  .upload-card:hover .upload-icon { color: var(--accent); }
+  .upload-card .upload-text { font-size: 14px; color: var(--text-muted); font-weight: 500; }
+  .upload-card .upload-sub { font-size: 12px; color: var(--text-muted); opacity: 0.6; margin-top: 4px; }
+
+  /* Lightbox */
+  .lightbox-overlay {
+    position: fixed; inset: 0; z-index: 300;
+    background: rgba(3, 5, 10, 0.92); backdrop-filter: blur(12px);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  }
+  .lightbox-overlay.open { opacity: 1; pointer-events: all; }
+  .lightbox-overlay.open .lightbox-img {
+    transform: scale(1); opacity: 1;
+  }
+  .lightbox-img {
+    max-width: 90vw; max-height: 85vh;
+    object-fit: contain; border-radius: var(--radius-sm);
+    box-shadow: 0 30px 100px rgba(0,0,0,0.7);
+    transform: scale(0.92); opacity: 0;
+    transition: transform 0.35s ease, opacity 0.35s ease;
+  }
+  .lightbox-close {
+    position: fixed; top: 20px; right: 28px; z-index: 301;
+    width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06); backdrop-filter: blur(8px);
+    color: var(--text-secondary); font-size: 22px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+  }
+  .lightbox-close:hover { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+  .lightbox-nav {
+    position: fixed; top: 50%; transform: translateY(-50%); z-index: 301;
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.08);
+    background: rgba(255,255,255,0.05); backdrop-filter: blur(8px);
+    color: var(--text-secondary); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s ease;
+  }
+  .lightbox-nav:hover { background: rgba(255,255,255,0.12); color: var(--text-primary); }
+  .lightbox-prev { left: 20px; }
+  .lightbox-next { right: 20px; }
+  .lightbox-caption {
+    position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 301;
+    max-width: 70vw; text-align: center;
+    font-size: 14px; color: var(--text-secondary); line-height: 1.5;
+    background: rgba(7, 11, 20, 0.7); backdrop-filter: blur(8px);
+    padding: 10px 24px; border-radius: 24px;
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Empty state */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 80px 20px; text-align: center;
+  }
+  .empty-state .empty-icon { font-size: 64px; opacity: 0.15; margin-bottom: 20px; }
+  .empty-state h3 { font-family: var(--font-display); font-size: 22px; color: var(--text-secondary); margin-bottom: 8px; }
+  .empty-state p { font-size: 14px; color: var(--text-muted); max-width: 360px; line-height: 1.6; }
+
+  /* Toast notification */
+  .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
+  .toast {
+    background: var(--bg-card); backdrop-filter: blur(16px);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+    padding: 12px 20px; font-size: 13px; color: var(--text-primary);
+    box-shadow: var(--shadow-deep);
+    animation: toast-in 0.3s ease, toast-out 0.3s ease 2.7s forwards;
+  }
+  @keyframes toast-in { from { opacity: 0; transform: translateX(30px); } }
+  @keyframes toast-out { to { opacity: 0; transform: translateX(30px); } }
+
+  /* ===== MUSIC PLAYER ===== */
+  .music-player-btn {
+    position: fixed; bottom: 32px; left: 36px; z-index: 50;
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--border-glow);
+    background: var(--bg-glass); backdrop-filter: blur(20px) saturate(1.4);
+    color: var(--accent); font-size: 20px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.3s ease; box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(201,169,110,0.06);
+  }
+  .music-player-btn:hover { background: rgba(201,169,110,0.15); transform: scale(1.08); box-shadow: 0 4px 24px rgba(0,0,0,0.5), 0 0 40px rgba(201,169,110,0.12); }
+  .music-player-btn.playing { animation: btn-pulse 2s ease-in-out infinite; }
+  @keyframes btn-pulse {
+    0%, 100% { box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 30px rgba(201,169,110,0.06); }
+    50% { box-shadow: 0 4px 20px rgba(0,0,0,0.4), 0 0 40px rgba(201,169,110,0.2); }
+  }
+  .music-player-btn .btn-icon { line-height: 1; }
+
+  /* Equalizer bars animation */
+  .eq-bars { display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+  .eq-bars span {
+    display: block; width: 3px; background: var(--accent); border-radius: 1px;
+    animation: eq-bar 0.8s ease-in-out infinite alternate;
+  }
+  .eq-bars span:nth-child(1) { height: 6px; animation-delay: 0s; }
+  .eq-bars span:nth-child(2) { height: 12px; animation-delay: 0.15s; }
+  .eq-bars span:nth-child(3) { height: 8px; animation-delay: 0.3s; }
+  .eq-bars span:nth-child(4) { height: 14px; animation-delay: 0.1s; }
+  @keyframes eq-bar {
+    0% { height: 4px; }
+    100% { height: 18px; }
+  }
+
+  /* Music panel */
+  .music-panel-overlay {
+    position: fixed; inset: 0; z-index: 90;
+    background: rgba(4, 6, 12, 0.5); backdrop-filter: blur(4px);
+    opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+  }
+  .music-panel-overlay.open { opacity: 1; pointer-events: all; }
+
+  .music-panel {
+    position: fixed; bottom: 92px; left: 36px; z-index: 91;
+    width: 340px; max-height: 420px;
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); overflow: hidden;
+    box-shadow: var(--shadow-deep);
+    transform: translateY(12px) scale(0.95); opacity: 0;
+    pointer-events: none; transition: all 0.3s ease;
+    display: flex; flex-direction: column;
+  }
+  .music-panel.open { transform: translateY(0) scale(1); opacity: 1; pointer-events: all; }
+
+  .music-panel-header {
+    padding: 18px 20px 14px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .music-panel-header h3 {
+    font-family: var(--font-display); font-size: 16px; font-weight: 600; color: var(--text-primary);
+  }
+  .music-panel-header .close-panel {
+    cursor: pointer; background: none; border: none; color: var(--text-muted);
+    font-size: 18px; padding: 4px; transition: color 0.2s;
+  }
+  .music-panel-header .close-panel:hover { color: var(--text-primary); }
+
+  /* Now playing bar */
+  .now-playing {
+    padding: 14px 20px; border-bottom: 1px solid var(--border-subtle);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .now-playing .np-info { flex: 1; min-width: 0; }
+  .now-playing .np-title {
+    font-size: 13px; font-weight: 600; color: var(--text-primary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .now-playing .np-artist {
+    font-size: 11px; color: var(--text-muted); margin-top: 2px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .now-playing .np-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .np-btn {
+    cursor: pointer; background: none; border: none; color: var(--text-secondary);
+    width: 32px; height: 32px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; transition: all 0.2s ease;
+  }
+  .np-btn:hover { color: var(--accent); background: var(--accent-dim); }
+  .np-btn.play-pause { width: 36px; height: 36px; background: var(--accent); color: var(--bg-deep); font-size: 16px; }
+  .np-btn.play-pause:hover { background: var(--accent-light); }
+
+  /* Progress bar */
+  .progress-bar-wrap {
+    padding: 0 20px 8px;
+  }
+  .progress-bar-bg {
+    width: 100%; height: 4px; background: rgba(255,255,255,0.06); border-radius: 2px;
+    cursor: pointer; position: relative;
+  }
+  .progress-bar-bg:hover { height: 6px; }
+  .progress-bar-fill {
+    height: 100%; background: var(--accent); border-radius: 2px;
+    transition: width 0.2s linear; position: relative;
+  }
+  .progress-bar-fill::after {
+    content: ''; position: absolute; right: -4px; top: 50%; transform: translateY(-50%);
+    width: 10px; height: 10px; background: var(--accent); border-radius: 50%;
+    opacity: 0; transition: opacity 0.2s;
+  }
+  .progress-bar-bg:hover .progress-bar-fill::after { opacity: 1; }
+  .progress-time {
+    display: flex; justify-content: space-between; margin-top: 4px;
+    font-size: 10px; color: var(--text-muted); font-family: var(--font-mono);
+  }
+
+  /* Volume */
+  .volume-row {
+    padding: 8px 20px 12px; display: flex; align-items: center; gap: 10px;
+  }
+  .volume-row .vol-icon { color: var(--text-muted); font-size: 14px; cursor: pointer; flex-shrink: 0; }
+  .volume-row .vol-icon:hover { color: var(--accent); }
+  .volume-slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; outline: none;
+  }
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--bg-surface);
+  }
+  .volume-slider::-moz-range-thumb {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; border: 2px solid var(--bg-surface);
+  }
+
+  /* Track list */
+  .track-list {
+    flex: 1; overflow-y: auto; max-height: 200px;
+  }
+  .track-list::-webkit-scrollbar { width: 4px; }
+  .track-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+
+  .track-item {
+    padding: 10px 20px; display: flex; align-items: center; gap: 10px;
+    cursor: pointer; transition: background 0.15s;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+  }
+  .track-item:hover { background: rgba(255,255,255,0.03); }
+  .track-item.active { background: var(--accent-dim); }
+  .track-item.active .track-name { color: var(--accent); }
+  .track-item .track-num { font-size: 11px; color: var(--text-muted); width: 20px; text-align: center; flex-shrink: 0; font-family: var(--font-mono); }
+  .track-item.active .track-num { color: var(--accent); }
+  .track-item .track-info { flex: 1; min-width: 0; }
+  .track-item .track-name {
+    font-size: 13px; color: var(--text-secondary);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .track-item .track-duration { font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); flex-shrink: 0; }
+  .track-item .track-remove {
+    cursor: pointer; background: none; border: none; color: var(--text-muted);
+    font-size: 14px; padding: 2px 4px; opacity: 0; transition: all 0.15s; flex-shrink: 0;
+  }
+  .track-item:hover .track-remove { opacity: 1; }
+  .track-item .track-remove:hover { color: var(--danger); }
+
+  /* Upload area */
+  .music-upload-area {
+    padding: 14px 20px; border-top: 1px solid var(--border-subtle);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    cursor: pointer; color: var(--text-muted); font-size: 12px; transition: all 0.2s;
+  }
+  .music-upload-area:hover { color: var(--accent); background: rgba(201,169,110,0.04); }
+  .music-upload-area .upload-plus { font-size: 16px; font-weight: 300; }
+
+  /* Track empty */
+  .track-empty {
+    padding: 30px 20px; text-align: center; color: var(--text-muted); font-size: 13px;
+  }
+
+  @media (max-width: 768px) {
+    .music-player-btn { bottom: 20px; left: 20px; width: 42px; height: 42px; font-size: 18px; }
+    .music-panel { left: 16px; right: 16px; width: auto; bottom: 74px; }
+  }
+
+  /* Starfield background for gallery */
+  #gallery-view::before {
+    content: ''; position: fixed; inset: 0; z-index: -1;
+    background: radial-gradient(ellipse at 30% 20%, rgba(201, 169, 110, 0.03) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 80%, rgba(30, 50, 100, 0.08) 0%, transparent 50%),
+                var(--bg-deep);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .globe-header { padding: 18px 20px; }
+    .globe-header h1 { font-size: 20px; }
+    .gallery-header { padding: 16px 20px; flex-wrap: wrap; }
+    .gallery-location-info h2 { font-size: 20px; }
+    .gallery-body { padding: 20px; }
+    .photo-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; }
+    .modal { padding: 24px; }
+  }
+
+  /* Hide file input */
+  .hidden-input { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ===== GLOBE VIEW ===== -->
+<div id="globe-view" class="view">
+  <div id="globe-canvas-container"></div>
+  <div class="globe-header">
+    <h1>和宝宝的世界<span>.</span></h1>
+    <button class="btn-add-location" onclick="openAddModal()">+ 添加地点</button>
+  </div>
+  <div class="location-tooltip" id="tooltip">
+    <div class="tt-name" id="tt-name"></div>
+    <div class="tt-desc" id="tt-desc"></div>
+    <div class="tt-hint">点击查看照片</div>
+  </div>
+  <div class="globe-hint">拖拽旋转 &middot; 滚轮缩放 &middot; 点击标记探索</div>
+</div>
+
+<!-- ===== GALLERY VIEW ===== -->
+<div id="gallery-view" class="view hidden">
+  <div class="gallery-header">
+    <button class="btn-back" onclick="goBackToGlobe()" title="返回地球">&#8592;</button>
+    <div class="gallery-location-info">
+      <h2 id="gallery-title">地点</h2>
+      <div class="gallery-coords" id="gallery-coords"></div>
+      <div class="gallery-desc" id="gallery-desc"></div>
+    </div>
+    <div class="gallery-actions">
+      <button class="btn-edit-location" onclick="openEditLocationModal()">编辑</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteCurrentLocation()">删除</button>
+    </div>
+  </div>
+  <div class="gallery-body">
+    <div id="gallery-content"></div>
+  </div>
+  <input type="file" id="photo-upload" class="hidden-input" accept="image/*" multiple onchange="handlePhotoUpload(event)">
+</div>
+
+<!-- ===== ADD/EDIT LOCATION MODAL ===== -->
+<div class="modal-overlay" id="location-modal">
+  <div class="modal">
+    <h2 id="modal-title">添加地点</h2>
+    <label for="loc-name">地点名称</label>
+    <input type="text" id="loc-name" placeholder="例如：圣托里尼，希腊" maxlength="60">
+    <label>坐标</label>
+    <div class="coord-row">
+      <div>
+        <input type="text" id="loc-lat" placeholder="纬度 (-90 到 90)">
+      </div>
+      <div>
+        <input type="text" id="loc-lng" placeholder="经度 (-180 到 180)">
+      </div>
+    </div>
+    <label for="loc-desc">描述</label>
+    <textarea id="loc-desc" placeholder="简单描述这个地方..." maxlength="200"></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeLocationModal()">取消</button>
+      <button class="btn btn-primary" id="modal-save-btn" onclick="saveLocation()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CONFIRM DELETE MODAL ===== -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal" style="width: 380px;">
+    <h2>确认删除</h2>
+    <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6;" id="confirm-text">确定要删除吗？</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeConfirmModal()">取消</button>
+      <button class="btn btn-danger" id="confirm-btn" onclick="">删除</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+
+<!-- ===== LIGHTBOX ===== -->
+<div class="lightbox-overlay" id="lightbox" onclick="closeLightbox(event)">
+  <img class="lightbox-img" id="lightbox-img" src="" alt="">
+</div>
+<button class="lightbox-close" id="lightbox-close" onclick="closeLightbox()" style="display:none;">&#215;</button>
+<button class="lightbox-nav lightbox-prev" id="lightbox-prev" onclick="lightboxNav(-1)" style="display:none;">&#9664;</button>
+<button class="lightbox-nav lightbox-next" id="lightbox-next" onclick="lightboxNav(1)" style="display:none;">&#9654;</button>
+<div class="lightbox-caption" id="lightbox-caption" style="display:none;"></div>
+
+<!-- ===== MUSIC PLAYER ===== -->
+<button class="music-player-btn" id="music-btn" onclick="toggleMusicPanel()">
+  <span class="btn-icon" id="music-btn-icon">&#9835;</span>
+</button>
+
+<div class="music-panel-overlay" id="music-overlay" onclick="closeMusicPanel()"></div>
+<div class="music-panel" id="music-panel">
+  <div class="music-panel-header">
+    <h3>音乐播放</h3>
+    <button class="close-panel" onclick="closeMusicPanel()">&#215;</button>
+  </div>
+  <div class="now-playing">
+    <div class="np-info">
+      <div class="np-title" id="np-title">未在播放</div>
+      <div class="np-artist" id="np-artist">--</div>
+    </div>
+    <div class="np-controls">
+      <button class="np-btn" onclick="playPrev()" title="上一首">&#9664;&#9664;</button>
+      <button class="np-btn play-pause" id="play-pause-btn" onclick="togglePlayPause()">&#9654;</button>
+      <button class="np-btn" onclick="playNext()" title="下一首">&#9654;&#9654;</button>
+    </div>
+  </div>
+  <div class="progress-bar-wrap">
+    <div class="progress-bar-bg" id="progress-bg" onclick="seekTo(event)">
+      <div class="progress-bar-fill" id="progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="progress-time">
+      <span id="time-current">0:00</span>
+      <span id="time-total">0:00</span>
+    </div>
+  </div>
+  <div class="volume-row">
+    <span class="vol-icon" id="vol-icon" onclick="toggleMute()">&#128266;</span>
+    <input type="range" class="volume-slider" id="volume-slider" min="0" max="100" value="70" oninput="setVolume(this.value)">
+  </div>
+  <div class="track-list" id="track-list">
+    <div class="track-empty">暂无音乐，点击下方添加</div>
+  </div>
+  <div class="music-upload-area" onclick="document.getElementById('music-upload-input').click()">
+    <span class="upload-plus">+</span> 添加音乐文件
+  </div>
+</div>
+<input type="file" id="music-upload-input" class="hidden-input" accept="audio/*" multiple onchange="handleMusicUpload(event)">
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// ===== DATA LAYER =====
+const STORAGE_KEY = 'wanderlust_data_zh';
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return { locations: defaultLocations() };
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
+}
+
+function defaultLocations() {
+  return [
+    { id: 'loc_1', name: '东京', lat: 35.6762, lng: 139.6503, description: '日本的心脏，古老神社与霓虹摩天楼交汇之地。', photos: [] },
+    { id: 'loc_2', name: '圣托里尼', lat: 36.3932, lng: 25.4615, description: '白色悬崖倾泻入爱琴海最深邃的蓝。', photos: [] },
+    { id: 'loc_3', name: '马丘比丘', lat: -13.1631, lng: -72.5450, description: '印加失落之城，矗立于安第斯云雾之中。', photos: [] },
+    { id: 'loc_4', name: '雷克雅未克', lat: 64.1466, lng: -21.9426, description: '冰与火的门户，北极光下间歇泉喷涌。', photos: [] },
+    { id: 'loc_5', name: '马拉喀什', lat: 31.6295, lng: -7.9811, description: '香料芬芳的迷宫，赤陶色的梦想之城。', photos: [] }
+  ];
+}
+
+let appData = loadData();
+let currentLocationId = null;
+let editingLocationId = null;
+let hoveredMarker = null;
+
+// ===== TOAST =====
+function showToast(msg) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3200);
+}
+
+// ===== THREE.JS GLOBE =====
+let scene, camera, renderer, globe, markers = [], markerMeshes = [];
+let raycaster, mouse;
+let isDragging = false, mouseDownPos = { x: 0, y: 0 }, lastMousePos = { x: 0, y: 0 };
+let mouseDownTime = 0;
+let targetRotationX = 0.3, targetRotationY = 0;
+let currentRotationX = 0.3, currentRotationY = 0;
+let autoRotate = true, autoRotateSpeed = 0.001;
+let zoomLevel = 2.8;
+
+function initGlobe() {
+  const container = document.getElementById('globe-canvas-container');
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.z = zoomLevel;
+
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
+  container.appendChild(renderer.domElement);
+
+  raycaster = new THREE.Raycaster();
+  mouse = new THREE.Vector2();
+
+  // Ambient light
+  scene.add(new THREE.AmbientLight(0x334466, 0.8));
+  const dirLight = new THREE.DirectionalLight(0xffeedd, 1.2);
+  dirLight.position.set(5, 3, 5);
+  scene.add(dirLight);
+  const rimLight = new THREE.DirectionalLight(0x4466aa, 0.5);
+  rimLight.position.set(-3, -1, -5);
+  scene.add(rimLight);
+
+  loadEarthTexture();
+  createStars();
+  createMarkers();
+  setupInteraction();
+
+  window.addEventListener('resize', onResize);
+  animate();
+}
+
+function loadEarthTexture() {
+  const R = 1;
+  const geo = new THREE.SphereGeometry(R, 64, 64);
+  const loader = new THREE.TextureLoader();
+  loader.crossOrigin = 'anonymous';
+  // Try multiple reliable earth texture sources
+  const textureUrls = [
+    'https://unpkg.com/three-globe/example/img/earth-night.jpg',
+    'https://unpkg.com/three-globe@2.31.0/example/img/earth-night.jpg',
+    'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg'
+  ];
+  const mat = new THREE.MeshPhongMaterial({
+    color: 0x446688,
+    emissive: 0x112233,
+    specular: 0x333333,
+    shininess: 15
+  });
+  globe = new THREE.Mesh(geo, mat);
+  scene.add(globe);
+
+  // Try loading texture from first available source
+  let loaded = false;
+  function tryLoad(index) {
+    if (index >= textureUrls.length || loaded) return;
+    loader.load(textureUrls[index],
+      (texture) => {
+        if (loaded) return;
+        loaded = true;
+        texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+        mat.map = texture;
+        mat.color.set(0xffffff);
+        mat.emissive.set(0x111822);
+        mat.needsUpdate = true;
+      },
+      undefined,
+      () => tryLoad(index + 1)
+    );
+  }
+  tryLoad(0);
+
+  // Atmosphere glow
+  const atmosGeo = new THREE.SphereGeometry(R + 0.06, 64, 64);
+  const atmosMat = new THREE.ShaderMaterial({
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      void main() {
+        float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+        gl_FragColor = vec4(0.15, 0.35, 0.75, 1.0) * intensity * 0.6;
+      }
+    `,
+    blending: THREE.AdditiveBlending,
+    side: THREE.BackSide,
+    transparent: true
+  });
+  const atmosphere = new THREE.Mesh(atmosGeo, atmosMat);
+  globe.add(atmosphere);
+}
+
+function createStars() {
+  const starCount = 1500;
+  const positions = new Float32Array(starCount * 3);
+  for (let i = 0; i < starCount; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 80;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 80;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 80;
+  }
+  const starGeo = new THREE.BufferGeometry();
+  starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xaabbdd, size: 0.08, transparent: true, opacity: 0.6 });
+  scene.add(new THREE.Points(starGeo, starMat));
+}
+
+function latLngToVec3(lat, lng, radius) {
+  const phi = (90 - lat) * (Math.PI / 180);
+  const theta = (lng + 180) * (Math.PI / 180);
+  const r = Math.max(0.001, radius);
+  return new THREE.Vector3(
+    -(r * Math.sin(phi) * Math.cos(theta)),
+    r * Math.cos(phi),
+    r * Math.sin(phi) * Math.sin(theta)
+  );
+}
+
+function createMarkers() {
+  // Clear old
+  markerMeshes.forEach(m => globe.remove(m));
+  markerMeshes = [];
+
+  appData.locations.forEach(loc => {
+    const pos = latLngToVec3(loc.lat, loc.lng, 1.02);
+    const group = new THREE.Group();
+
+    // Pin stem
+    const stemGeo = new THREE.CylinderGeometry(0.003, 0.003, 0.08, 8);
+    const stemMat = new THREE.MeshBasicMaterial({ color: 0xc9a96e, transparent: true, opacity: 0.7 });
+    const stem = new THREE.Mesh(stemGeo, stemMat);
+    stem.position.y = 0.04;
+    group.add(stem);
+
+    // Pin head
+    const headGeo = new THREE.SphereGeometry(0.022, 16, 16);
+    const headMat = new THREE.MeshBasicMaterial({ color: 0xc9a96e });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 0.09;
+    group.add(head);
+
+    // Glow
+    const glowGeo = new THREE.SphereGeometry(0.04, 16, 16);
+    const glowMat = new THREE.MeshBasicMaterial({ color: 0xc9a96e, transparent: true, opacity: 0.15 });
+    const glow = new THREE.Mesh(glowGeo, glowMat);
+    glow.position.y = 0.09;
+    group.add(glow);
+
+    // Pulse ring
+    const pulseGeo = new THREE.RingGeometry(0.02, 0.05, 32);
+    const pulseMat = new THREE.MeshBasicMaterial({ color: 0xc9a96e, transparent: true, opacity: 0.2, side: THREE.DoubleSide });
+    const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+    pulse.position.y = 0.091;
+    pulse.lookAt(pos.clone().multiplyScalar(2));
+    pulse.userData.isPulse = true;
+    pulse.userData.baseOpacity = 0.2;
+    group.add(pulse);
+
+    group.position.copy(pos);
+    group.lookAt(pos.clone().multiplyScalar(2));
+    group.rotateX(Math.PI / 2);
+    group.userData.locationId = loc.id;
+    group.userData.isMarker = true;
+
+    globe.add(group);
+    markerMeshes.push(group);
+  });
+}
+
+function setupInteraction() {
+  const canvas = renderer.domElement;
+
+  canvas.addEventListener('mousedown', e => {
+    isDragging = true;
+    mouseDownPos = { x: e.clientX, y: e.clientY };
+    lastMousePos = { x: e.clientX, y: e.clientY };
+    mouseDownTime = Date.now();
+    autoRotate = false;
+  });
+
+  canvas.addEventListener('mousemove', e => {
+    if (isDragging) {
+      const dx = e.clientX - lastMousePos.x;
+      const dy = e.clientY - lastMousePos.y;
+      targetRotationY += dx * 0.005;
+      targetRotationX += dy * 0.005;
+      targetRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotationX));
+      lastMousePos = { x: e.clientX, y: e.clientY };
+      hideTooltip();
+      return;
+    }
+    updateTooltip(e);
+  });
+
+  canvas.addEventListener('mouseup', e => {
+    const dist = Math.sqrt(
+      Math.pow(e.clientX - mouseDownPos.x, 2) +
+      Math.pow(e.clientY - mouseDownPos.y, 2)
+    );
+    const elapsed = Date.now() - mouseDownTime;
+    // Only treat as click if barely moved and quick press
+    if (dist < 6 && elapsed < 300) {
+      handleClick(e);
+    }
+    isDragging = false;
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    hideTooltip();
+    isDragging = false;
+  });
+
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    zoomLevel += e.deltaY * 0.002;
+    zoomLevel = Math.max(1.6, Math.min(5, zoomLevel));
+  }, { passive: false });
+
+  // Touch
+  let touchStart = null;
+  let touchStartTime = 0;
+  canvas.addEventListener('touchstart', e => {
+    if (e.touches.length === 1) {
+      touchStart = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      touchStartTime = Date.now();
+      autoRotate = false;
+    }
+  });
+  canvas.addEventListener('touchmove', e => {
+    if (touchStart && e.touches.length === 1) {
+      const dx = e.touches[0].clientX - lastMousePos.x;
+      const dy = e.touches[0].clientY - lastMousePos.y;
+      targetRotationY += dx * 0.005;
+      targetRotationX += dy * 0.005;
+      targetRotationX = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, targetRotationX));
+      lastMousePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    e.preventDefault();
+  }, { passive: false });
+  canvas.addEventListener('touchend', e => {
+    if (touchStart && e.changedTouches.length === 1) {
+      const t = e.changedTouches[0];
+      const dist = Math.sqrt(Math.pow(t.clientX - touchStart.x, 2) + Math.pow(t.clientY - touchStart.y, 2));
+      const elapsed = Date.now() - touchStartTime;
+      if (dist < 10 && elapsed < 300) {
+        handleClick({ clientX: t.clientX, clientY: t.clientY });
+      }
+    }
+    touchStart = null;
+  });
+}
+
+function updateTooltip(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const allHitTargets = [];
+  markerMeshes.forEach(m => m.traverse(child => {
+    if (child.isMesh) allHitTargets.push(child);
+  }));
+
+  const hits = raycaster.intersectObjects(allHitTargets, false);
+  const tooltip = document.getElementById('tooltip');
+
+  if (hits.length > 0) {
+    let hitObj = hits[0].object;
+    // Find parent group with locationId
+    let locId = null;
+    let current = hitObj;
+    while (current) {
+      if (current.userData && current.userData.locationId) { locId = current.userData.locationId; break; }
+      current = current.parent;
+    }
+    if (locId) {
+      const loc = appData.locations.find(l => l.id === locId);
+      if (loc) {
+        document.getElementById('tt-name').textContent = loc.name;
+        document.getElementById('tt-desc').textContent = loc.description || '';
+        tooltip.style.left = (e.clientX + 18) + 'px';
+        tooltip.style.top = (e.clientY - 10) + 'px';
+        tooltip.classList.add('visible');
+        renderer.domElement.style.cursor = 'pointer';
+        hoveredMarker = locId;
+        return;
+      }
+    }
+  }
+  hideTooltip();
+}
+
+function hideTooltip() {
+  document.getElementById('tooltip').classList.remove('visible');
+  renderer.domElement.style.cursor = 'grab';
+  hoveredMarker = null;
+}
+
+function handleClick(e) {
+  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+
+  const allHitTargets = [];
+  markerMeshes.forEach(m => m.traverse(child => {
+    if (child.isMesh) allHitTargets.push(child);
+  }));
+
+  const hits = raycaster.intersectObjects(allHitTargets, false);
+  if (hits.length > 0) {
+    let hitObj = hits[0].object;
+    let locId = null;
+    let current = hitObj;
+    while (current) {
+      if (current.userData && current.userData.locationId) { locId = current.userData.locationId; break; }
+      current = current.parent;
+    }
+    if (locId) {
+      openGallery(locId);
+    }
+  }
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+let clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const t = clock.getElapsedTime();
+
+  if (autoRotate) targetRotationY += autoRotateSpeed;
+  currentRotationX += (targetRotationX - currentRotationX) * 0.08;
+  currentRotationY += (targetRotationY - currentRotationY) * 0.08;
+
+  globe.rotation.x = currentRotationX;
+  globe.rotation.y = currentRotationY;
+
+  // Animate pulse rings
+  markerMeshes.forEach(m => {
+    m.traverse(child => {
+      if (child.userData && child.userData.isPulse) {
+        const s = 1 + Math.sin(t * 2) * 0.3;
+        child.scale.set(s, s, 1);
+        child.material.opacity = child.userData.baseOpacity * (1 - (s - 1) / 0.3 * 0.5);
+      }
+    });
+  });
+
+  // Smooth zoom
+  camera.position.z += (zoomLevel - camera.position.z) * 0.1;
+
+  renderer.render(scene, camera);
+}
+
+// ===== LOCATION MODAL =====
+function openAddModal() {
+  editingLocationId = null;
+  document.getElementById('modal-title').textContent = '添加地点';
+  document.getElementById('loc-name').value = '';
+  document.getElementById('loc-lat').value = '';
+  document.getElementById('loc-lng').value = '';
+  document.getElementById('loc-desc').value = '';
+  document.getElementById('modal-save-btn').textContent = '添加地点';
+  document.getElementById('location-modal').classList.add('open');
+  setTimeout(() => document.getElementById('loc-name').focus(), 100);
+}
+
+function openEditModalForLocation(locId) {
+  const loc = appData.locations.find(l => l.id === locId);
+  if (!loc) return;
+  editingLocationId = locId;
+  document.getElementById('modal-title').textContent = '编辑地点';
+  document.getElementById('loc-name').value = loc.name;
+  document.getElementById('loc-lat').value = loc.lat;
+  document.getElementById('loc-lng').value = loc.lng;
+  document.getElementById('loc-desc').value = loc.description || '';
+  document.getElementById('modal-save-btn').textContent = '保存修改';
+  document.getElementById('location-modal').classList.add('open');
+  setTimeout(() => document.getElementById('loc-name').focus(), 100);
+}
+
+function closeLocationModal() {
+  document.getElementById('location-modal').classList.remove('open');
+}
+
+function saveLocation() {
+  const name = document.getElementById('loc-name').value.trim();
+  const lat = parseFloat(document.getElementById('loc-lat').value);
+  const lng = parseFloat(document.getElementById('loc-lng').value);
+  const desc = document.getElementById('loc-desc').value.trim();
+
+  if (!name) { showToast('请输入地点名称'); return; }
+  if (isNaN(lat) || lat < -90 || lat > 90) { showToast('纬度范围：-90 到 90'); return; }
+  if (isNaN(lng) || lng < -180 || lng > 180) { showToast('经度范围：-180 到 180'); return; }
+
+  if (editingLocationId) {
+    const loc = appData.locations.find(l => l.id === editingLocationId);
+    if (loc) {
+      loc.name = name; loc.lat = lat; loc.lng = lng; loc.description = desc;
+      showToast('地点已更新');
+    }
+  } else {
+    appData.locations.push({
+      id: 'loc_' + Date.now(),
+      name, lat, lng, description: desc, photos: []
+    });
+    showToast('地点已添加');
+  }
+
+  saveData();
+  createMarkers();
+  closeLocationModal();
+
+  // If we're in gallery, refresh
+  if (currentLocationId) renderGallery();
+}
+
+function openEditLocationModal() {
+  if (currentLocationId) openEditModalForLocation(currentLocationId);
+}
+
+function deleteCurrentLocation() {
+  if (!currentLocationId) return;
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc) return;
+  showConfirm(`删除"${loc.name}"及其所有照片？此操作不可撤销。`, () => {
+    appData.locations = appData.locations.filter(l => l.id !== currentLocationId);
+    saveData();
+    createMarkers();
+    goBackToGlobe();
+    showToast('地点已删除');
+  });
+}
+
+// ===== CONFIRM MODAL =====
+let confirmCallback = null;
+function showConfirm(text, callback) {
+  document.getElementById('confirm-text').textContent = text;
+  confirmCallback = callback;
+  document.getElementById('confirm-btn').onclick = () => {
+    closeConfirmModal();
+    if (confirmCallback) confirmCallback();
+  };
+  document.getElementById('confirm-modal').classList.add('open');
+}
+function closeConfirmModal() {
+  document.getElementById('confirm-modal').classList.remove('open');
+}
+
+// ===== PHOTO GALLERY =====
+function openGallery(locId) {
+  currentLocationId = locId;
+  const loc = appData.locations.find(l => l.id === locId);
+  if (!loc) return;
+
+  document.getElementById('gallery-title').textContent = loc.name;
+  document.getElementById('gallery-coords').textContent = `${loc.lat.toFixed(4)}\u00b0, ${loc.lng.toFixed(4)}\u00b0`;
+  document.getElementById('gallery-desc').textContent = loc.description || '';
+
+  renderGallery();
+
+  document.getElementById('globe-view').classList.add('hidden');
+  document.getElementById('gallery-view').classList.remove('hidden');
+  document.getElementById('gallery-view').scrollTop = 0;
+}
+
+function renderGallery() {
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc) return;
+  const container = document.getElementById('gallery-content');
+
+  if (!loc.photos || loc.photos.length === 0) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">&#128247;</div>
+        <h3>暂无照片</h3>
+        <p>来自${loc.name}的照片将显示在这里，上传你的第一张照片吧。</p>
+        <button class="btn btn-primary" style="margin-top: 24px;" onclick="triggerUpload()">上传照片</button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '<div class="photo-grid">';
+  loc.photos.forEach((photo, i) => {
+    html += `
+      <div class="photo-card" style="animation-delay: ${i * 0.06}s">
+        <div class="photo-img-wrap" onclick="openLightbox(${i})">
+          <img src="${photo.data}" alt="${photo.caption || '照片'}" loading="lazy">
+          <button class="photo-delete-btn" onclick="deletePhoto(${i})" title="删除照片">&times;</button>
+        </div>
+        <div class="photo-caption" ondblclick="startEditCaption(${i}, this)">
+          <div class="caption-edit-hint">双击编辑</div>
+          <span class="caption-text">${escapeHtml(photo.caption || '添加文案...')}</span>
+        </div>
+      </div>
+    `;
+  });
+
+  // Upload card
+  html += `
+    <div class="upload-card" onclick="triggerUpload()">
+      <div class="upload-icon">+</div>
+      <div class="upload-text">上传照片</div>
+      <div class="upload-sub">点击选择文件</div>
+    </div>
+  `;
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function goBackToGlobe() {
+  currentLocationId = null;
+  document.getElementById('gallery-view').classList.add('hidden');
+  document.getElementById('globe-view').classList.remove('hidden');
+  autoRotate = true;
+}
+
+function triggerUpload() {
+  document.getElementById('photo-upload').click();
+}
+
+function handlePhotoUpload(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc) return;
+  if (!loc.photos) loc.photos = [];
+
+  let loaded = 0;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      loc.photos.push({ data: ev.target.result, caption: '' });
+      loaded++;
+      if (loaded === files.length) {
+        saveData();
+        renderGallery();
+        showToast(`已上传 ${loaded} 张照片`);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  e.target.value = '';
+}
+
+function deletePhoto(index) {
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc || !loc.photos) return;
+  showConfirm('删除这张照片？此操作不可撤销。', () => {
+    loc.photos.splice(index, 1);
+    saveData();
+    renderGallery();
+    showToast('照片已删除');
+  });
+}
+
+function startEditCaption(index, el) {
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc || !loc.photos[index]) return;
+
+  const currentCaption = loc.photos[index].caption || '';
+  el.innerHTML = `<input type="text" class="photo-caption-input" value="${escapeAttr(currentCaption)}" placeholder="写一段文案...">`;
+  const input = el.querySelector('input');
+  input.focus();
+  input.select();
+
+  const finish = () => {
+    loc.photos[index].caption = input.value.trim();
+    saveData();
+    renderGallery();
+  };
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { input.value = currentCaption; input.blur(); }
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+function escapeAttr(str) {
+  return str.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ===== LIGHTBOX =====
+let lightboxIndex = -1;
+
+function openLightbox(index) {
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc || !loc.photos[index]) return;
+  lightboxIndex = index;
+  const photo = loc.photos[index];
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightbox-img').src = photo.data;
+  lb.classList.add('open');
+  document.getElementById('lightbox-close').style.display = 'flex';
+  document.getElementById('lightbox-caption').style.display = 'block';
+  document.getElementById('lightbox-caption').textContent = photo.caption || '';
+  // Show nav if more than 1 photo
+  const showNav = loc.photos.length > 1;
+  document.getElementById('lightbox-prev').style.display = showNav ? 'flex' : 'none';
+  document.getElementById('lightbox-next').style.display = showNav ? 'flex' : 'none';
+}
+
+function closeLightbox(e) {
+  if (e && e.target && e.target.id !== 'lightbox') return;
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox-close').style.display = 'none';
+  document.getElementById('lightbox-prev').style.display = 'none';
+  document.getElementById('lightbox-next').style.display = 'none';
+  document.getElementById('lightbox-caption').style.display = 'none';
+  lightboxIndex = -1;
+}
+
+function lightboxNav(dir) {
+  const loc = appData.locations.find(l => l.id === currentLocationId);
+  if (!loc || !loc.photos.length) return;
+  let next = lightboxIndex + dir;
+  if (next < 0) next = loc.photos.length - 1;
+  if (next >= loc.photos.length) next = 0;
+  openLightbox(next);
+}
+
+// ===== KEYBOARD SHORTCUTS =====
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (lightboxIndex >= 0) closeLightbox();
+    else if (document.getElementById('music-panel').classList.contains('open')) closeMusicPanel();
+    else if (document.getElementById('location-modal').classList.contains('open')) closeLocationModal();
+    else if (document.getElementById('confirm-modal').classList.contains('open')) closeConfirmModal();
+    else if (currentLocationId) goBackToGlobe();
+  }
+  // Lightbox arrow navigation
+  if (lightboxIndex >= 0) {
+    if (e.key === 'ArrowLeft') { e.preventDefault(); lightboxNav(-1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); lightboxNav(1); }
+  }
+  if (e.code === 'Space' && !e.target.matches('input, textarea')) {
+    const mpOpen = document.getElementById('music-panel').classList.contains('open');
+    const musicPlaying = musicTracks.length > 0;
+    if (mpOpen || musicPlaying) { e.preventDefault(); togglePlayPause(); }
+  }
+});
+
+// ===== MUSIC PLAYER =====
+const MUSIC_KEY = 'wanderlust_music';
+let musicTracks = []; // { name, data (objectURL), duration }
+let currentTrackIndex = -1;
+let isPlaying = false;
+let audioEl = new Audio();
+audioEl.volume = 0.7;
+let musicPanelOpen = false;
+let prevVolume = 0.7;
+
+function loadMusicData() {
+  try {
+    const raw = localStorage.getItem(MUSIC_KEY);
+    if (raw) { const d = JSON.parse(raw); if (d.tracks) musicTracks = d.tracks; }
+  } catch(e) {}
+  // Restore volume
+  const vol = localStorage.getItem('wanderlust_vol');
+  if (vol !== null) {
+    audioEl.volume = parseFloat(vol);
+    document.getElementById('volume-slider').value = Math.round(audioEl.volume * 100);
+  }
+}
+
+function toggleMusicPanel() {
+  musicPanelOpen = !musicPanelOpen;
+  document.getElementById('music-panel').classList.toggle('open', musicPanelOpen);
+  document.getElementById('music-overlay').classList.toggle('open', musicPanelOpen);
+}
+
+function closeMusicPanel() {
+  musicPanelOpen = false;
+  document.getElementById('music-panel').classList.remove('open');
+  document.getElementById('music-overlay').classList.remove('open');
+}
+
+function formatTime(sec) {
+  if (!sec || isNaN(sec)) return '0:00';
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return m + ':' + (s < 10 ? '0' : '') + s;
+}
+
+function renderTrackList() {
+  const container = document.getElementById('track-list');
+  if (musicTracks.length === 0) {
+    container.innerHTML = '<div class="track-empty">暂无音乐，点击下方添加</div>';
+    return;
+  }
+  let html = '';
+  musicTracks.forEach((t, i) => {
+    const active = i === currentTrackIndex ? ' active' : '';
+    const name = escapeHtml(t.name || '未知曲目');
+    html += `
+      <div class="track-item${active}" onclick="playTrack(${i})">
+        <span class="track-num">${i + 1}</span>
+        <div class="track-info">
+          <div class="track-name">${name}</div>
+        </div>
+        <span class="track-duration">${t.duration ? formatTime(t.duration) : ''}</span>
+        <button class="track-remove" onclick="event.stopPropagation(); removeTrack(${i})" title="移除">&times;</button>
+      </div>`;
+  });
+  container.innerHTML = html;
+}
+
+function updateNowPlaying() {
+  const titleEl = document.getElementById('np-title');
+  const artistEl = document.getElementById('np-artist');
+  const btnIcon = document.getElementById('music-btn-icon');
+  const ppBtn = document.getElementById('play-pause-btn');
+  const musicBtn = document.getElementById('music-btn');
+
+  if (currentTrackIndex >= 0 && currentTrackIndex < musicTracks.length) {
+    const t = musicTracks[currentTrackIndex];
+    titleEl.textContent = t.name || '未知曲目';
+    artistEl.textContent = t.artist || '';
+  } else {
+    titleEl.textContent = '未在播放';
+    artistEl.textContent = '--';
+  }
+
+  if (isPlaying) {
+    ppBtn.innerHTML = '&#9646;&#9646;';
+    btnIcon.innerHTML = '<span class="eq-bars"><span></span><span></span><span></span><span></span></span>';
+    musicBtn.classList.add('playing');
+  } else {
+    ppBtn.innerHTML = '&#9654;';
+    btnIcon.innerHTML = '&#9835;';
+    musicBtn.classList.remove('playing');
+  }
+}
+
+function updateProgress() {
+  if (audioEl.duration && isFinite(audioEl.duration)) {
+    const pct = (audioEl.currentTime / audioEl.duration) * 100;
+    document.getElementById('progress-fill').style.width = pct + '%';
+    document.getElementById('time-current').textContent = formatTime(audioEl.currentTime);
+    document.getElementById('time-total').textContent = formatTime(audioEl.duration);
+  }
+}
+
+function playTrack(index) {
+  if (index < 0 || index >= musicTracks.length) return;
+  currentTrackIndex = index;
+  audioEl.src = musicTracks[index].data;
+  audioEl.play().catch(() => {});
+  isPlaying = true;
+  // Reset progress display immediately
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('time-current').textContent = '0:00';
+  document.getElementById('time-total').textContent = musicTracks[index].duration ? formatTime(musicTracks[index].duration) : '0:00';
+  updateNowPlaying();
+  renderTrackList();
+}
+
+function togglePlayPause() {
+  if (musicTracks.length === 0) return;
+  if (currentTrackIndex < 0) { playTrack(0); return; }
+  if (isPlaying) {
+    audioEl.pause();
+    isPlaying = false;
+  } else {
+    audioEl.play().catch(() => {});
+    isPlaying = true;
+  }
+  updateNowPlaying();
+}
+
+function playNext() {
+  if (musicTracks.length === 0) return;
+  let next = (currentTrackIndex + 1) % musicTracks.length;
+  playTrack(next);
+}
+
+function playPrev() {
+  if (musicTracks.length === 0) return;
+  // If more than 3s in, restart; otherwise go to prev
+  if (audioEl.currentTime > 3) {
+    audioEl.currentTime = 0;
+    return;
+  }
+  let prev = (currentTrackIndex - 1 + musicTracks.length) % musicTracks.length;
+  playTrack(prev);
+}
+
+function seekTo(e) {
+  const bar = document.getElementById('progress-bg');
+  const rect = bar.getBoundingClientRect();
+  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+  if (audioEl.duration) {
+    audioEl.currentTime = pct * audioEl.duration;
+  }
+}
+
+function setVolume(val) {
+  const v = parseInt(val) / 100;
+  audioEl.volume = v;
+  prevVolume = v > 0 ? v : prevVolume;
+  localStorage.setItem('wanderlust_vol', v.toString());
+  updateVolumeIcon();
+}
+
+function toggleMute() {
+  if (audioEl.volume > 0) {
+    prevVolume = audioEl.volume;
+    audioEl.volume = 0;
+    document.getElementById('volume-slider').value = 0;
+  } else {
+    audioEl.volume = prevVolume || 0.7;
+    document.getElementById('volume-slider').value = Math.round(audioEl.volume * 100);
+  }
+  updateVolumeIcon();
+}
+
+function updateVolumeIcon() {
+  const icon = document.getElementById('vol-icon');
+  if (audioEl.volume === 0) icon.innerHTML = '&#128263;';
+  else if (audioEl.volume < 0.5) icon.innerHTML = '&#128265;';
+  else icon.innerHTML = '&#128266;';
+}
+
+function removeTrack(index) {
+  const wasPlaying = (index === currentTrackIndex);
+  URL.revokeObjectURL(musicTracks[index].data);
+  musicTracks.splice(index, 1);
+  if (wasPlaying) {
+    audioEl.pause();
+    isPlaying = false;
+    if (musicTracks.length > 0) {
+      currentTrackIndex = Math.min(index, musicTracks.length - 1);
+      playTrack(currentTrackIndex);
+    } else {
+      currentTrackIndex = -1;
+      document.getElementById('progress-fill').style.width = '0%';
+      document.getElementById('time-current').textContent = '0:00';
+      document.getElementById('time-total').textContent = '0:00';
+    }
+  } else if (index < currentTrackIndex) {
+    currentTrackIndex--;
+  }
+  updateNowPlaying();
+  renderTrackList();
+  showToast('已移除音乐');
+}
+
+function handleMusicUpload(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+
+  let added = 0;
+  files.forEach(file => {
+    const url = URL.createObjectURL(file);
+    const name = file.name.replace(/\.[^/.]+$/, ''); // strip extension
+    const tempAudio = new Audio();
+    tempAudio.src = url;
+    tempAudio.addEventListener('loadedmetadata', () => {
+      musicTracks.push({ name, data: url, duration: tempAudio.duration, artist: '' });
+      added++;
+      if (added === files.length) {
+        renderTrackList();
+        updateNowPlaying();
+        showToast(`已添加 ${added} 首音乐`);
+        // Auto-play first if nothing playing
+        if (currentTrackIndex < 0) playTrack(musicTracks.length - files.length);
+      }
+    });
+    tempAudio.addEventListener('error', () => {
+      added++;
+      if (added === files.length) {
+        renderTrackList();
+        updateNowPlaying();
+      }
+    });
+  });
+  e.target.value = '';
+}
+
+// Audio events
+audioEl.addEventListener('timeupdate', updateProgress);
+audioEl.addEventListener('ended', () => {
+  if (musicTracks.length > 1) playNext();
+  else { isPlaying = false; updateNowPlaying(); }
+});
+
+// ===== INIT =====
+loadMusicData();
+renderTrackList();
+updateVolumeIcon();
+initGlobe();
+</script>
+</body>
+</html>
