@@ -1356,9 +1356,11 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ===== MUSIC PLAYER =====
-const MUSIC_KEY = 'wanderlust_music';
-let musicTracks = []; // { name, data (objectURL), duration }
+// ===== MUSIC PLAYER (IndexedDB persistence) =====
+const MUSIC_DB_NAME = 'WanderlustMusicDB';
+const MUSIC_DB_VER = 1;
+const MUSIC_STORE = 'tracks';
+let musicTracks = []; // { id, name, duration, artist, blobUrl }
 let currentTrackIndex = -1;
 let isPlaying = false;
 let audioEl = new Audio();
@@ -1366,17 +1368,67 @@ audioEl.volume = 0.7;
 let musicPanelOpen = false;
 let prevVolume = 0.7;
 
-function loadMusicData() {
+function openMusicDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(MUSIC_DB_NAME, MUSIC_DB_VER);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(MUSIC_STORE)) {
+        db.createObjectStore(MUSIC_STORE, { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e.target.error);
+  });
+}
+
+async function loadMusicData() {
   try {
-    const raw = localStorage.getItem(MUSIC_KEY);
-    if (raw) { const d = JSON.parse(raw); if (d.tracks) musicTracks = d.tracks; }
-  } catch(e) {}
+    const db = await openMusicDB();
+    const tx = db.transaction(MUSIC_STORE, 'readonly');
+    const store = tx.objectStore(MUSIC_STORE);
+    const req = store.getAll();
+    return new Promise((resolve, reject) => {
+      req.onsuccess = () => {
+        const rows = req.result;
+        musicTracks = rows.map(r => ({
+          id: r.id, name: r.name, duration: r.duration || 0,
+          artist: r.artist || '', blobUrl: URL.createObjectURL(r.blob)
+        }));
+        resolve();
+      };
+      req.onerror = e => reject(e.target.error);
+    });
+  } catch(e) {
+    console.warn('Failed to load music from IndexedDB', e);
+  }
   // Restore volume
   const vol = localStorage.getItem('wanderlust_vol');
   if (vol !== null) {
     audioEl.volume = parseFloat(vol);
     document.getElementById('volume-slider').value = Math.round(audioEl.volume * 100);
   }
+}
+
+async function saveTrackToDB(file, name, duration) {
+  const db = await openMusicDB();
+  const id = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+  const tx = db.transaction(MUSIC_STORE, 'readwrite');
+  tx.objectStore(MUSIC_STORE).put({ id, name, duration, artist: '', blob: file });
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve(id);
+    tx.onerror = e => reject(e.target.error);
+  });
+}
+
+async function removeTrackFromDB(id) {
+  const db = await openMusicDB();
+  const tx = db.transaction(MUSIC_STORE, 'readwrite');
+  tx.objectStore(MUSIC_STORE).delete(id);
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = e => reject(e.target.error);
+  });
 }
 
 function toggleMusicPanel() {
@@ -1460,7 +1512,7 @@ function updateProgress() {
 function playTrack(index) {
   if (index < 0 || index >= musicTracks.length) return;
   currentTrackIndex = index;
-  audioEl.src = musicTracks[index].data;
+  audioEl.src = musicTracks[index].blobUrl;
   audioEl.play().catch(() => {});
   isPlaying = true;
   // Reset progress display immediately
@@ -1537,10 +1589,12 @@ function updateVolumeIcon() {
   else icon.innerHTML = '&#128266;';
 }
 
-function removeTrack(index) {
+async function removeTrack(index) {
   const wasPlaying = (index === currentTrackIndex);
-  URL.revokeObjectURL(musicTracks[index].data);
+  const trackId = musicTracks[index].id;
+  URL.revokeObjectURL(musicTracks[index].blobUrl);
   musicTracks.splice(index, 1);
+  await removeTrackFromDB(trackId).catch(() => {});
   if (wasPlaying) {
     audioEl.pause();
     isPlaying = false;
@@ -1561,35 +1615,34 @@ function removeTrack(index) {
   showToast('已移除音乐');
 }
 
-function handleMusicUpload(e) {
+async function handleMusicUpload(e) {
   const files = Array.from(e.target.files);
   if (!files.length) return;
 
   let added = 0;
-  files.forEach(file => {
-    const url = URL.createObjectURL(file);
-    const name = file.name.replace(/\.[^/.]+$/, ''); // strip extension
-    const tempAudio = new Audio();
-    tempAudio.src = url;
-    tempAudio.addEventListener('loadedmetadata', () => {
-      musicTracks.push({ name, data: url, duration: tempAudio.duration, artist: '' });
-      added++;
-      if (added === files.length) {
-        renderTrackList();
-        updateNowPlaying();
-        showToast(`已添加 ${added} 首音乐`);
-        // Auto-play first if nothing playing
-        if (currentTrackIndex < 0) playTrack(musicTracks.length - files.length);
-      }
+  for (const file of files) {
+    const name = file.name.replace(/\.[^/.]+$/, '');
+    const duration = await new Promise(resolve => {
+      const tmp = new Audio();
+      tmp.src = URL.createObjectURL(file);
+      tmp.onloadedmetadata = () => { resolve(tmp.duration); URL.revokeObjectURL(tmp.src); };
+      tmp.onerror = () => resolve(0);
     });
-    tempAudio.addEventListener('error', () => {
-      added++;
-      if (added === files.length) {
-        renderTrackList();
-        updateNowPlaying();
-      }
-    });
-  });
+    const blobUrl = URL.createObjectURL(file);
+    musicTracks.push({ id: '', name, duration, artist: '', blobUrl });
+    const idx = musicTracks.length - 1;
+    try {
+      const id = await saveTrackToDB(file, name, duration);
+      musicTracks[idx].id = id;
+    } catch(err) {
+      console.warn('Failed to persist music file:', err);
+    }
+    added++;
+  }
+  renderTrackList();
+  updateNowPlaying();
+  showToast(`已添加 ${added} 首音乐`);
+  if (currentTrackIndex < 0 && musicTracks.length > 0) playTrack(musicTracks.length - added);
   e.target.value = '';
 }
 
@@ -1601,10 +1654,12 @@ audioEl.addEventListener('ended', () => {
 });
 
 // ===== INIT =====
-loadMusicData();
-renderTrackList();
-updateVolumeIcon();
-initGlobe();
+(async () => {
+  await loadMusicData();
+  renderTrackList();
+  updateVolumeIcon();
+  initGlobe();
+})();
 </script>
 </body>
 </html>
